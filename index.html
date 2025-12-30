@@ -10,7 +10,7 @@
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       
-      // CONFIGURATION
+      // --- CONFIGURATION ---
       const MY_WHATSAPP_NUMBER = "919328060689"; 
       const MSG_NEW = "Subscribe"; 
       const MSG_EXISTING = "Send todays update";
@@ -19,20 +19,25 @@
       const urlParams = new URLSearchParams(window.location.search);
       const userPhone = urlParams.get('phone');
 
-      // Helper: Trigger Redirect
-      function triggerWhatsAppRedirect(type) {
+      // --- HELPER: Redirect Logic ---
+      function openWhatsApp(type) {
           const msg = type === 'new' ? MSG_NEW : MSG_EXISTING;
           const url = `https://wa.me/${MY_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
           
-          // Update UI
+          // Show "Redirecting" UI
           document.getElementById("loader").style.display = "flex";
           document.getElementById("main-content").style.display = "none";
-          document.getElementById("loading-text").innerText = "Redirecting to WhatsApp...";
+          document.getElementById("loading-text").innerText = "Opening WhatsApp...";
           
-          // Redirect after 1 second
+          // 1. Try Automatic Redirect
+          window.location.href = url;
+
+          // 2. Safety Net: If it doesn't open in 2 seconds, show a manual link
           setTimeout(() => {
-              window.location.href = url;
-          }, 1000);
+              document.getElementById("loading-text").innerText = "Tap below to open:";
+              document.getElementById("manual-link").style.display = "block";
+              document.getElementById("manual-link").href = url;
+          }, 2000);
       }
 
       OneSignalDeferred.push(function(OneSignal) {
@@ -45,36 +50,37 @@
           allowLocalhostAsSecureOrigin: true,
         });
 
-        // --- LOGIC: Check Status on Load ---
-        setTimeout(() => {
-            // Check if user is ALREADY subscribed
+        // --- MOBILE FIX: Retry Loop ---
+        // We check status 5 times (at 0s, 1s, 2s, 3s, 4s) to catch slow mobile connections
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+            attempts++;
             const isSubscribed = OneSignal.User.PushSubscription.optedIn;
-            
+
             if (isSubscribed) {
-                console.log("✅ User already subscribed. Redirecting...");
-                triggerWhatsAppRedirect('existing');
-            } else {
-                console.log("❌ User NOT subscribed. Showing button.");
+                // SUCCESS: User is found! Stop checking and redirect.
+                clearInterval(checkInterval);
+                console.log("✅ User found (Attempt " + attempts + ")");
+                openWhatsApp('existing');
+            } 
+            else if (attempts >= 4) {
+                // GAVE UP: User is likely NOT subscribed. Show the Join Button.
+                clearInterval(checkInterval);
+                console.log("❌ User not subscribed. Showing UI.");
                 document.getElementById("loader").style.display = "none";
                 document.getElementById("main-content").style.display = "flex";
             }
-        }, 1500); // Wait 1.5s to ensure OneSignal loads data
+        }, 1000); // Run every 1 second
 
-        // --- LOGIC: Handle New Subscription Click ---
+        // --- EVENT: New Subscription ---
         OneSignal.User.PushSubscription.addEventListener("change", function(event) {
           if (event.current.optedIn) {
-            console.log("🎉 User just clicked Allow!");
-            
-            // Tag them
             if(userPhone) OneSignal.User.addTag("phone_number", userPhone);
-            
-            // Redirect
-            triggerWhatsAppRedirect('new');
+            openWhatsApp('new');
           }
         });
       });
 
-      // Button Click
       function requestPermission() {
           window.OneSignalDeferred.push(function(OneSignal) {
               OneSignal.Slidedown.promptPush();
@@ -84,8 +90,8 @@
 
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #111b21; /* WhatsApp Dark Mode BG */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #111b21;
             color: white;
             display: flex;
             flex-direction: column;
@@ -96,86 +102,44 @@
             text-align: center;
         }
 
-        /* CARD STYLE */
-        .container {
-            width: 90%;
-            max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        /* PROFILE IMAGE */
+        .container { width: 90%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
+        
         .profile-img {
-            width: 90px;
-            height: 90px;
-            border-radius: 50%;
-            background-color: #00a884;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 35px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            width: 90px; height: 90px; border-radius: 50%; background-color: #00a884;
+            display: flex; align-items: center; justify-content: center; font-size: 35px;
+            margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
 
         h2 { margin: 0 0 10px; font-weight: 600; font-size: 22px; }
         p { color: #8696a0; font-size: 15px; margin-bottom: 30px; line-height: 1.5; }
 
-        /* GREEN BUTTON */
         .btn {
-            background-color: #00a884;
-            color: #111b21;
-            border: none;
-            padding: 16px 20px;
-            font-size: 16px;
-            border-radius: 25px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            transition: transform 0.1s;
+            background-color: #00a884; color: #111b21; border: none; padding: 16px 20px;
+            font-size: 16px; border-radius: 25px; cursor: pointer; width: 100%; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
         }
-        .btn:active { transform: scale(0.98); background-color: #008f6f; }
+        .btn:active { background-color: #008f6f; }
 
-        /* LOADER SCREEN */
-        #loader {
-            display: flex; /* Visible by default */
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+        #loader { display: flex; flex-direction: column; align-items: center; }
         .spinner {
-            border: 4px solid rgba(255,255,255,0.1);
-            border-left-color: #00a884;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
+            border: 4px solid rgba(255,255,255,0.1); border-left-color: #00a884;
+            border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* MAIN CONTENT (Hidden initially) */
-        #main-content {
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-        }
+        #main-content { display: none; flex-direction: column; align-items: center; width: 100%; }
 
-        /* SKIP LINK */
-        .skip-link {
-            margin-top: 25px;
-            color: #53bdeb;
-            font-size: 13px;
+        /* The Safety Button (Hidden by default) */
+        #manual-link {
+            display: none;
+            margin-top: 15px;
+            background: transparent;
+            border: 1px solid #00a884;
+            color: #00a884;
+            padding: 10px 20px;
+            border-radius: 20px;
             text-decoration: none;
-            border-bottom: 1px dashed #53bdeb;
-            padding-bottom: 2px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -184,7 +148,8 @@
     <div class="container">
         <div id="loader">
             <div class="spinner"></div>
-            <p id="loading-text">Checking subscription status...</p>
+            <p id="loading-text">Loading...</p>
+            <a id="manual-link" href="#">Open WhatsApp</a>
         </div>
 
         <div id="main-content">
@@ -200,10 +165,6 @@
                 <span>👉</span> <span>Join on WhatsApp</span>
             </button>
         </div>
-
-        <a href="https://wa.me/919328060689?text=Subscribe" class="skip-link">
-            Not working? Click here to open WhatsApp
-        </a>
     </div>
 
 </body>
