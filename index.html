@@ -12,6 +12,8 @@
       
       // --- CONFIGURATION ---
       const MY_WHATSAPP_NUMBER = "919328060689"; 
+      
+      // Messages
       const MSG_NEW = "Subscribe"; 
       const MSG_EXISTING = "Send todays update";
 
@@ -19,25 +21,27 @@
       const urlParams = new URLSearchParams(window.location.search);
       const userPhone = urlParams.get('phone');
 
-      // --- HELPER: Redirect Logic ---
-      function openWhatsApp(type) {
+      // --- MAIN REDIRECT FUNCTION ---
+      function performRedirect(type) {
           const msg = type === 'new' ? MSG_NEW : MSG_EXISTING;
-          const url = `https://wa.me/${MY_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
           
-          // Show "Redirecting" UI
+          // Using api.whatsapp.com is more reliable for deep linking
+          const url = `https://api.whatsapp.com/send?phone=${MY_WHATSAPP_NUMBER}&text=${encodeURIComponent(msg)}`;
+          
+          // Update UI Text
           document.getElementById("loader").style.display = "flex";
           document.getElementById("main-content").style.display = "none";
           document.getElementById("loading-text").innerText = "Opening WhatsApp...";
           
-          // 1. Try Automatic Redirect
-          window.location.href = url;
+          // Update the "Safety Button" immediately
+          const manualLink = document.getElementById("manual-link");
+          manualLink.href = url;
+          manualLink.style.display = "block";
 
-          // 2. Safety Net: If it doesn't open in 2 seconds, show a manual link
+          // Attempt Auto-Redirect
           setTimeout(() => {
-              document.getElementById("loading-text").innerText = "Tap below to open:";
-              document.getElementById("manual-link").style.display = "block";
-              document.getElementById("manual-link").href = url;
-          }, 2000);
+              window.location.href = url;
+          }, 1000);
       }
 
       OneSignalDeferred.push(function(OneSignal) {
@@ -50,37 +54,52 @@
           allowLocalhostAsSecureOrigin: true,
         });
 
-        // --- MOBILE FIX: Retry Loop ---
-        // We check status 5 times (at 0s, 1s, 2s, 3s, 4s) to catch slow mobile connections
+        // --- CHECK STATUS LOOP (Runs every 1s) ---
         let attempts = 0;
         const checkInterval = setInterval(() => {
             attempts++;
-            const isSubscribed = OneSignal.User.PushSubscription.optedIn;
+            
+            // Check if OneSignal is fully loaded
+            if (OneSignal.User && OneSignal.User.PushSubscription) {
+                const isSubscribed = OneSignal.User.PushSubscription.optedIn;
 
-            if (isSubscribed) {
-                // SUCCESS: User is found! Stop checking and redirect.
-                clearInterval(checkInterval);
-                console.log("✅ User found (Attempt " + attempts + ")");
-                openWhatsApp('existing');
-            } 
-            else if (attempts >= 4) {
-                // GAVE UP: User is likely NOT subscribed. Show the Join Button.
-                clearInterval(checkInterval);
-                console.log("❌ User not subscribed. Showing UI.");
-                document.getElementById("loader").style.display = "none";
-                document.getElementById("main-content").style.display = "flex";
+                if (isSubscribed) {
+                    // STOP Checking
+                    clearInterval(checkInterval);
+                    console.log("✅ User is ALREADY Subscribed.");
+
+                    // *** CRITICAL FIX: UPDATE TAG EVEN IF SUBSCRIBED ***
+                    if (userPhone) {
+                        console.log("🔄 Updating Phone Tag to: " + userPhone);
+                        OneSignal.User.addTag("phone_number", userPhone);
+                    }
+
+                    // Redirect
+                    performRedirect('existing');
+                } 
+                else if (attempts >= 3) {
+                    // STOP Checking -> User is NOT subscribed
+                    clearInterval(checkInterval);
+                    console.log("❌ New User detected.");
+                    
+                    // Show the Join Button
+                    document.getElementById("loader").style.display = "none";
+                    document.getElementById("main-content").style.display = "flex";
+                }
             }
-        }, 1000); // Run every 1 second
+        }, 1000);
 
-        // --- EVENT: New Subscription ---
+        // --- EVENT: User Clicks Allow ---
         OneSignal.User.PushSubscription.addEventListener("change", function(event) {
           if (event.current.optedIn) {
+            console.log("🎉 Permission Granted!");
             if(userPhone) OneSignal.User.addTag("phone_number", userPhone);
-            openWhatsApp('new');
+            performRedirect('new');
           }
         });
       });
 
+      // --- BUTTON CLICK ---
       function requestPermission() {
           window.OneSignalDeferred.push(function(OneSignal) {
               OneSignal.Slidedown.promptPush();
@@ -120,6 +139,7 @@
         }
         .btn:active { background-color: #008f6f; }
 
+        /* Loader */
         #loader { display: flex; flex-direction: column; align-items: center; }
         .spinner {
             border: 4px solid rgba(255,255,255,0.1); border-left-color: #00a884;
@@ -127,19 +147,20 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* Main Content */
         #main-content { display: none; flex-direction: column; align-items: center; width: 100%; }
 
-        /* The Safety Button (Hidden by default) */
+        /* Safety Button */
         #manual-link {
-            display: none;
-            margin-top: 15px;
+            display: none; /* Hidden until redirect starts */
+            margin-top: 20px;
             background: transparent;
-            border: 1px solid #00a884;
-            color: #00a884;
-            padding: 10px 20px;
+            border: 1px solid #53bdeb;
+            color: #53bdeb;
+            padding: 10px 25px;
             border-radius: 20px;
             text-decoration: none;
-            font-weight: bold;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -149,7 +170,7 @@
         <div id="loader">
             <div class="spinner"></div>
             <p id="loading-text">Loading...</p>
-            <a id="manual-link" href="#">Open WhatsApp</a>
+            <a id="manual-link" href="#">Tap here to Open WhatsApp</a>
         </div>
 
         <div id="main-content">
