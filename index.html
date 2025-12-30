@@ -19,7 +19,9 @@
           appId: "111d15bc-6774-4842-8555-50208b06fdfd",
           safari_web_id: "web.onesignal.auto.0d8cfe1b-addf-4fe0-8094-42e4bf6360cd",
           notifyButton: { enable: true },
-          allowLocalhostAsSecureOrigin: true,
+          serviceWorkerPath: "OneSignalSDKWorker.js",
+          serviceWorkerParam: { scope: "/MuskanTraders/" },
+          allowLocalhostAsSecureOrigin: true
         });
 
         // 2. The Logic: If they subscribe, TAG them immediately
