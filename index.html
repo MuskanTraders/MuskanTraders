@@ -21,11 +21,9 @@
         OneSignal.init({
           appId: "111d15bc-6774-4842-8555-50208b06fdfd", // Your App ID
           notifyButton: { enable: false }, // Hide the default bell
-          
-          // --- PATH CONFIGURATION ---
-          serviceWorkerPath: "/MuskanTraders/OneSignalSDKWorker.js",
-          serviceWorkerParam: { scope: "/MuskanTraders/" },
           path: "/MuskanTraders/",
+          serviceWorkerPath: "OneSignalSDKWorker.js",
+          serviceWorkerParam: { scope: "/MuskanTraders/" },
           allowLocalhostAsSecureOrigin: true,
         });
 
