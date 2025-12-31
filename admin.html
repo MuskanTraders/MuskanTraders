@@ -29,7 +29,8 @@
       <input type="password" id="password" value="muskan123">
 
       <button onclick="testNow()" style="background:#007bff; margin-top:10px;">🧪 Test Connection (Send Immediate)</button>
-
+      <button onclick="forceWorker()" style="background:#ff9800; margin-top:10px;">⚡ Force Run Worker (Simulate Timer)</button>
+      
       <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
 
       <label>Message</label>
@@ -96,6 +97,9 @@
 
     function testNow() {
       apiCall({ action: "test_immediate" });
+    }
+    function forceWorker() {
+      apiCall({ task: "check_schedule" });
     }
 
     function schedule() {
