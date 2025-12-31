@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Muskan Admin</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; background: #e5ddd5; display: flex; justify-content: center; padding: 20px; }
+    .app { background: white; width: 100%; max-width: 400px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
+    .header { background: #008069; color: white; padding: 15px; text-align: center; font-weight: bold; }
+    .content { padding: 20px; }
+    input, textarea, select { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+    label { display: block; margin-top: 15px; font-size: 13px; font-weight: bold; color: #54656f; }
+    button { width: 100%; padding: 12px; background: #008069; color: white; border: none; font-weight: bold; border-radius: 24px; margin-top: 20px; cursor: pointer; }
+    button:disabled { background: #ccc; }
+    
+    .status { text-align: center; margin-top: 10px; font-size: 14px; min-height: 20px; }
+    .error { color: red; } .success { color: green; }
+    
+    .task-list { background: #f0f2f5; padding: 10px; margin-top: 20px; border-radius: 8px; }
+    .task { background: white; padding: 10px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid #008069; font-size: 14px; }
+    .badge { background: #dcf8c6; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+  <div class="app">
+    <div class="header">📢 Muskan Command Center</div>
+    <div class="content">
+      
+      <label>Admin Password</label>
+      <input type="password" id="password" value="muskan123">
+
+      <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+      <label>Message</label>
+      <textarea id="msg" rows="3" placeholder="Type update..."></textarea>
+
+      <label>Image URL (Optional)</label>
+      <input type="text" id="img" placeholder="https://...">
+
+      <label>Frequency</label>
+      <select id="freq">
+        <option value="once">Send Once (Now)</option>
+        <option value="1hr">Every 1 Hour</option>
+        <option value="daily">Every 24 Hours</option>
+      </select>
+
+      <button onclick="schedule()" id="btn">🚀 Launch Notification</button>
+      <div id="status" class="status"></div>
+
+      <div class="task-list">
+        <div style="font-weight:bold; color:#54656f; margin-bottom:10px;">Active Schedules</div>
+        <div id="list">Loading...</div>
+      </div>
+
+      <button onclick="clearAll()" style="background:#ea0038; margin-top:10px;">🛑 Stop All</button>
+    </div>
+  </div>
+
+  <script>
+    // ⚠️ PASTE YOUR SUPABASE FUNCTION URL HERE ⚠️
+    const API_URL = "https://upvprcemxefhviwptqnb.supabase.co/functions/v1/onesignal-notification-UI";
+
+    async function apiCall(body) {
+      const pass = document.getElementById('password').value;
+      const btn = document.getElementById('btn');
+      const status = document.getElementById('status');
+      
+      status.innerText = "Processing...";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, password: pass })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || "Request failed");
+        
+        status.innerText = "✅ Success!";
+        status.className = "status success";
+        loadList(); // Refresh list
+        return data;
+
+      } catch (err) {
+        status.innerText = "❌ " + err.message;
+        status.className = "status error";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function schedule() {
+      apiCall({
+        action: "schedule",
+        msg: document.getElementById('msg').value,
+        img: document.getElementById('img').value,
+        freq: document.getElementById('freq').value
+      });
+    }
+
+    function clearAll() {
+      if(confirm("Stop all messages?")) {
+        apiCall({ action: "clear" });
+      }
+    }
+
+    async function loadList() {
+      const pass = document.getElementById('password').value;
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: "list", password: pass })
+        });
+        const tasks = await res.json();
+        
+        const listDiv = document.getElementById('list');
+        if (tasks.length === 0) {
+          listDiv.innerHTML = "<div style='color:#888; text-align:center'>No active schedules</div>";
+          return;
+        }
+
+        listDiv.innerHTML = tasks.map(t => `
+          <div class="task">
+            <span class="badge">${t.freq}</span> 
+            <b>${t.msg}</b>
+            <div style="font-size:11px; color:#666; margin-top:4px">Next: ${new Date(t.next_run).toLocaleTimeString()}</div>
+          </div>
+        `).join('');
+      } catch (e) { console.log("List error", e); }
+    }
+
+    // Load list on startup
+    loadList();
+  </script>
+</body>
+</html>
